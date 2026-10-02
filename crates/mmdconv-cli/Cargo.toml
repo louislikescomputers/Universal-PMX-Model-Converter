@@ -1,0 +1,18 @@
+[package]
+name = "mmdconv-cli"
+description = "mmdconv command-line interface."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "mmdconv"
+path = "src/main.rs"
+
+[dependencies]
+mmdconv-core = { path = "../mmdconv-core" }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+rayon = "1"

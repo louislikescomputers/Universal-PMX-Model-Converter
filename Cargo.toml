@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["crates/mmdconv-core", "crates/mmdconv-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+license = "MIT"
+repository = "https://github.com/example/mmdconv"
+
+[profile.release]
+lto = "thin"
+codegen-units = 16
+panic = "abort"
