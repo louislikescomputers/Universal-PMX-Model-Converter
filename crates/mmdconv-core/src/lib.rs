@@ -120,7 +120,7 @@ pub mod detect {
     }
 
     fn detect_by_extension(path: &Path) -> Format {
-        match path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()) {
+        match path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
             Some("glb") | Some("vrm") => Format::Glb,
             Some("gltf") => Format::Gltf,
             Some("pmx") => Format::Pmx,
@@ -472,6 +472,7 @@ pub mod convert {
             pmx.display_frames.push(mf);
         }
 
+        let has_textures = !tex_paths.is_empty();
         pmx.textures = tex_paths;
         pmx.bones = bones;
 
@@ -486,7 +487,7 @@ pub mod convert {
         if truncated > 0 {
             warnings.push(format!("{truncated} vertices had more than 4 bone influences; kept the 4 strongest and renormalized"));
         }
-        if !pmx.materials.is_empty() && !has_any_texture(ir) && !tex_paths.is_empty() {
+        if !pmx.materials.is_empty() && !has_any_texture(ir) && has_textures {
             // informational only
         }
 
@@ -531,7 +532,11 @@ pub mod convert {
             .iter()
             .filter(|b| b.kind == crate::ir::BoneKind::Joint)
             .map(|b| b.global.transform_point3(Vec3::ZERO))
-            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .min_by(|a, b| {
+                let ka = (a.x.to_bits(), a.y.to_bits(), a.z.to_bits());
+                let kb = (b.x.to_bits(), b.y.to_bits(), b.z.to_bits());
+                ka.cmp(&kb)
+            })
             .unwrap_or(Vec3::ZERO)
     }
 
@@ -734,14 +739,14 @@ pub mod convert {
             crate::TextureFormat::Bmp => image::ImageFormat::Bmp,
         };
         let mut sink = std::io::Cursor::new(Vec::<u8>::new());
-        let enc_result = if opts.texture_format == crate::TextureFormat::Jpg {
+        if opts.texture_format == crate::TextureFormat::Jpg {
             let rgb = image::DynamicImage::ImageRgba8(img).to_rgb8();
             rgb.write_to(&mut sink, fmt)
         } else {
             img.write_to(&mut sink, fmt)
         }
         .map_err(|e| MmdconvError::input(format!("encoding texture '{}': {e}", tex.name)))?;
-        let bytes = sink.into_inner();
+        let buf = sink.into_inner();
         std::fs::write(&full, &buf).map_err(|e| MmdconvError::io(full.display().to_string(), e))?;
         let rel = format!("{}/{}", opts.texture_dir, fname);
         written.insert(tid, rel.clone());

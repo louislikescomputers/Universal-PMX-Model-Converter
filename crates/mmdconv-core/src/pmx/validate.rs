@@ -169,7 +169,7 @@ pub fn validate(m: &PmxModel, check_files: Option<&std::path::Path>) -> Validati
                     r.errors.push(format!("bone {i} IK has duplicate link {}", l.bone));
                 }
                 if l.limit_enabled {
-                    let d = (l.upper - l.lower);
+                    let d = l.upper - l.lower;
                     if d.x < 0.0 || d.y < 0.0 || d.z < 0.0 {
                         r.errors.push(format!("bone {i} IK link {} has inverted angle limits", l.bone));
                     } else if d.x.max(d.y).max(d.z) == 0.0 {

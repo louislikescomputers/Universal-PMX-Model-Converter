@@ -295,9 +295,9 @@ pub fn import_gltf_json(
     }
 
     // ---- nodes → skeleton ----
-    let nodes = json.get("nodes").and_then(|n| n.as_array()).cloned().unwrap_or_default();
-    let skins = json.get("skins").and_then(|s| s.as_array()).cloned().unwrap_or_default();
-    let meshes_json = json.get("meshes").and_then(|m| m.as_array()).cloned().unwrap_or_default();
+    let nodes = json.get("nodes").and_then(|n| n.as_array_owned()).unwrap_or_default();
+    let skins = json.get("skins").and_then(|s| s.as_array_owned()).unwrap_or_default();
+    let meshes_json = json.get("meshes").and_then(|m| m.as_array_owned()).unwrap_or_default();
 
     // node → bone id (all nodes become bones in IR; kind distinguishes them)
     let mut node_bone: Vec<BoneId> = vec![u32::MAX; nodes.len()];
@@ -422,9 +422,9 @@ pub fn import_gltf_json(
     }
 
     // ---- materials ----
-    let mats_json = json.get("materials").and_then(|m| m.as_array()).cloned().unwrap_or_default();
-    let textures_json = json.get("textures").and_then(|t| t.as_array()).cloned().unwrap_or_default();
-    let images_json = json.get("images").and_then(|i| i.as_array()).cloned().unwrap_or_default();
+    let mats_json = json.get("materials").and_then(|m| m.as_array_owned()).unwrap_or_default();
+    let textures_json = json.get("textures").and_then(|t| t.as_array_owned()).unwrap_or_default();
+    let images_json = json.get("images").and_then(|i| i.as_array_owned()).unwrap_or_default();
     let mut image_cache: Vec<Option<TextureId>> = vec![None; images_json.len()];
     let mut tex_path_cache: std::collections::HashMap<String, TextureId> = Default::default();
 
@@ -535,11 +535,11 @@ pub fn import_gltf_json(
             if let Some(ibm) = skins[si].get("inverseBindMatrices").and_then(|i| i.as_usize_index()) {
                 let floats = bp.accessor_f32(json, ibm, None)?;
                 for c in floats.chunks_exact(16) {
-                    mesh.inverse_bind.push(Mat4::from_cols_array(c));
+                    mesh.inverse_bind.push(Mat4::from_cols_array(c.try_into().unwrap()));
                 }
             }
         }
-        for prim in mj.get("primitives").and_then(|p| p.as_array()).cloned().unwrap_or_default() {
+        for prim in mj.get("primitives").and_then(|p| p.as_array_owned()).unwrap_or_default() {
             let attrs = prim.get("attributes").cloned().unwrap_or(JsonValue::Obj(vec![]));
             let pos_acc = attrs.get("POSITION").and_then(|a| a.as_usize_index())
                 .ok_or_else(|| MmdconvError::input(format!("mesh {mesh_idx}: primitive without POSITION")))?;
@@ -587,7 +587,7 @@ pub fn import_gltf_json(
                 mesh.vertices.push(vert);
             }
             let material = prim.get("material").and_then(|m| m.as_usize_index()).unwrap_or(0).min(model.materials.len() - 1) as MaterialId;
-            let indices = match prim.get("indices").and_then(|i| i.as_usize_index()) {
+            let indices: Vec<u32> = match prim.get("indices").and_then(|i| i.as_usize_index()) {
                 Some(ia) => {
                     let raw = bp.accessor_indices(json, ia)?;
                     raw.into_iter().map(|x| x + base).collect()
@@ -644,7 +644,7 @@ pub fn import_gltf_json(
             Some(p) => p,
             None => continue,
         };
-        for (ti, target) in mj.get("targets").and_then(|t| t.as_array()).cloned().unwrap_or_default().iter().enumerate() {
+        for (ti, target) in mj.get("targets").and_then(|t| t.as_array_owned()).unwrap_or_default().iter().enumerate() {
             let name = target.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string();
             let mut offsets = Vec::new();
             let mut ok = true;
@@ -727,10 +727,10 @@ fn load_texture(
     if let Some(id) = image_cache[img_idx] {
         return Ok(Some(id));
     }
-    let images = json.get("images").and_then(|i| i.as_array()).cloned().unwrap_or_default();
+    let images = json.get("images").and_then(|i| i.as_array_owned()).unwrap_or_default();
     let img = &images[img_idx];
     let data = if let Some(view_idx) = img.get("bufferView").and_then(|b| b.as_usize_index()) {
-        let bvs = json.get("bufferViews").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        let bvs = json.get("bufferViews").and_then(|v| v.as_array_owned()).unwrap_or_default();
         let bv = bvs.get(view_idx).ok_or_else(|| MmdconvError::input("image bufferView out of range"))?;
         let buf_idx = bv.get("buffer").and_then(|b| b.as_usize_index()).unwrap_or(0);
         let off = bv.get("byteOffset").and_then(|b| b.as_f64()).unwrap_or(0.0) as usize;
@@ -855,9 +855,8 @@ fn import_vrm_extensions(
     let springs_json = vrm
         .get("springBone")
         .and_then(|s| s.get("springs"))
-        .and_then(|a| a.as_array())
-        .cloned()
-        .or_else(|| vrm.get("springBone").and_then(|s| s.as_array()).cloned())
+        .and_then(|a| a.as_array_owned())
+        .or_else(|| vrm.get("springBone").and_then(|s| s.as_array_owned()))
         .unwrap_or_default();
     for sp in springs_json {
         let mut sb = SpringBone {
@@ -879,7 +878,7 @@ fn import_vrm_extensions(
                 let _ = cg; // collider group resolution below when available
             }
         }
-        for j in sp.get("bones").and_then(|b| b.as_array()).cloned().unwrap_or_default() {
+        for j in sp.get("bones").and_then(|b| b.as_array_owned()).unwrap_or_default() {
             let Some(ni) = j.get("bone").and_then(|b| b.as_usize_index()).or_else(|| j.as_usize_index()) else { continue };
             if let Some(&bid) = node_bone.get(ni) {
                 if sb.joint == u32::MAX {
