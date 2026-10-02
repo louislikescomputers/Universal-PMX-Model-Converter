@@ -57,22 +57,48 @@ try {
 
     if ($Tests) {
         Write-Host "`n-- test suite --" -ForegroundColor Yellow
-        cargo test --workspace @ProfileFlag
+        $TestArgs = @("test", "--workspace") + $ProfileFlag
+        & cargo @TestArgs
         if ($LASTEXITCODE -ne 0) { throw "tests failed" }
     }
 
     # --- Build ---------------------------------------------------------------
-    Write-Host "`n-- building mmdconv (--workspace bin) --" -ForegroundColor Yellow
-    cargo build @ProfileFlag --bin mmdconv @TargetArgs
+    # NOTE: arguments are assembled into a single array and splatted once.
+    # Mixing `@Array` splatting with bare literal arguments in the same native
+    # command call can hand stray '-' tokens to cargo on some PowerShell
+    # versions ("error: unexpected argument '-' found"), so we avoid it here.
+    Write-Host "`n-- building mmdconv (release binary: mmdconv) --" -ForegroundColor Yellow
+    $BuildArgs = @("build") + $ProfileFlag + @("--bin", "mmdconv") + $TargetArgs
+    & cargo @BuildArgs
     if ($LASTEXITCODE -ne 0) { throw "cargo build failed (exit $LASTEXITCODE)" }
 
     # --- Collect artifact ------------------------------------------------------
-    $SrcBin = Join-Path "target" (Join-Path $Profile "mmdconv.exe")
-    if ($Triple -ne "") {
-        $SrcBin = Join-Path "target" (Join-Path $Triple (Join-Path $Profile "mmdconv.exe"))
+    # Ask cargo exactly where it put the binary. This is robust against
+    # CARGO_TARGET_DIR overrides, custom profiles and target subdirectories.
+    $QueryArgs = @("build") + $ProfileFlag + @("--bin", "mmdconv") + $TargetArgs + @("--message-format", "json-render-diagnostics")
+    $ArtifactPath = $null
+    foreach ($line in (& cargo @QueryArgs)) {
+        try {
+            $obj = $line | ConvertFrom-Json
+        } catch { continue }
+        if ($obj.reason -eq "compiler-artifact" -and $obj.executable) {
+            if ($obj.executable -match "mmdconv(\.exe)?$") { $ArtifactPath = $obj.executable }
+        }
     }
-    if (-not (Test-Path $SrcBin)) {
-        throw "expected artifact not found: $SrcBin"
+    if (-not $ArtifactPath) {
+        # Fallback to the conventional location.
+        $ArtifactPath = Join-Path $Root "target"
+        if ($Triple -ne "") { $ArtifactPath = Join-Path $ArtifactPath $Triple }
+        $ArtifactPath = Join-Path (Join-Path $ArtifactPath $Profile) "mmdconv.exe"
+    }
+    $SrcBin = (Resolve-Path -ErrorAction SilentlyContinue $ArtifactPath)
+    if (-not $SrcBin) {
+        throw "expected artifact not found: $ArtifactPath (did the build produce a 'mmdconv' binary?)"
+    }
+    $SrcBin = $SrcBin.Path
+    # Guard against the old silent no-op stub: a real optimized binary is MBs.
+    if ((Get-Item $SrcBin).Length -lt 100kb) {
+        throw "artifact is suspiciously small ($((Get-Item $SrcBin).Length) bytes) - looks like a stub, not a real build."
     }
 
     $Dist = Join-Path $Root "dist"

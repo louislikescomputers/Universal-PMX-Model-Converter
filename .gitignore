@@ -1,1 +1,5 @@
-(empty)
+# Rust build artifacts
+target/
+
+# Distribution artifacts
+dist/
