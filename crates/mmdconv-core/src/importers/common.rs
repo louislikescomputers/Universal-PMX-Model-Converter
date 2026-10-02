@@ -3,7 +3,7 @@
 
 use crate::error::{MmdconvError, Result};
 use crate::ir::{Mesh, Vertex, Weight};
-use glam::{Vec3, Vec3A};
+use glam::Vec3;
 
 /// Triangulate an index list of arbitrary polygons (quads, n-gons) into a
 /// triangle fan per polygon. `winding` = vertices per polygon.
@@ -36,7 +36,7 @@ pub fn points_as_vec3(data: &[f32]) -> Vec<Vec3> {
 /// cross-product magnitude (power heuristic), then normalizes.
 pub fn compute_smooth_normals(mesh: &mut Mesh) {
     let n = mesh.vertices.len();
-    let mut acc = vec![Vec3A::ZERO; n];
+    let mut acc = vec![Vec3::ZERO; n];
     for p in &mesh.primitives {
         for tri in p.indices.chunks_exact(3) {
             let (a, b, c) = (tri[0] as usize, tri[1] as usize, tri[2] as usize);
@@ -50,11 +50,11 @@ pub fn compute_smooth_normals(mesh: &mut Mesh) {
             if !cr.is_finite() {
                 continue;
             }
-            let na = Vec3A::from_vec3(cr);
+            let na = cr;
             // power-of-heuristic weighting per corner
-            let pa = Vec3A::from_vec3(va);
-            let pb = Vec3A::from_vec3(vb);
-            let pc = Vec3A::from_vec3(vc);
+            let pa = va;
+            let pb = vb;
+            let pc = vc;
             let wa = (pb - pa).length().max(1e-9) * (pc - pa).length().max(1e-9);
             let wb = (pa - pb).length().max(1e-9) * (pc - pb).length().max(1e-9);
             let wc = (pa - pc).length().max(1e-9) * (pb - pc).length().max(1e-9);
@@ -67,7 +67,7 @@ pub fn compute_smooth_normals(mesh: &mut Mesh) {
     for (i, v) in mesh.vertices.iter_mut().enumerate() {
         let len = acc[i].length();
         if len > 1e-12 {
-            v.normal = acc[i].normalize().as_vec3();
+            v.normal = acc[i].normalize();
         } else {
             v.normal = Vec3::Y;
         }
