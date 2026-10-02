@@ -2,16 +2,22 @@
 #
 # Usage:
 #   .\compile.ps1                 # release build (default)
-#   .\compile.ps1 -Debug          # debug build
+#   .\compile.ps1 -BuildDebug     # debug build
 #   .\compile.ps1 -Tests          # run the test suite first; abort on failure
 #   .\compile.ps1 -Clippy         # run cargo clippy -D warnings first
 #   .\compile.ps1 -Triple aarch64-pc-windows-msvc   # cross-compile target
 #
 # Output binary is copied to .\dist\mmdconv.exe
+#
+# NOTE: we deliberately do NOT declare a [switch]$Debug here. PowerShell
+# scripts get the common parameter -Debug automatically (from [CmdletBinding()]),
+# so declaring our own would fail at load time with:
+#   "A parameter with the name 'Debug' was defined multiple times for the command."
+# Use -BuildDebug for a debug build instead.
 
 [CmdletBinding()]
 param(
-    [switch]$Debug,
+    [switch]$BuildDebug,
     [switch]$Tests,
     [switch]$Clippy,
     [string]$Triple = ""
@@ -31,8 +37,8 @@ try {
         exit 1
     }
 
-    $Profile = if ($Debug) { "debug" } else { "release" }
-    $ProfileFlag = if ($Debug) { @() } else { @("--release") }
+    $Profile = if ($BuildDebug) { "debug" } else { "release" }
+    $ProfileFlag = if ($BuildDebug) { @() } else { @("--release") }
     $TargetArgs = @()
     if ($Triple -ne "") {
         $TargetArgs = @("--target", $Triple)
