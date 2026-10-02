@@ -15,7 +15,7 @@ fails.
 
 ```powershell
 .\compile.ps1                 # release build -> dist\mmdconv.exe (+ .sha256)
-.\compile.ps1 -Debug          # debug build
+.\compile.ps1 -BuildDebug     # debug build (note: NOT -Debug; that name collides with PowerShell's common parameter)
 .\compile.ps1 -Tests          # run cargo test first, abort on failure
 .\compile.ps1 -Clippy         # gate on clippy -D warnings
 .\compile.ps1 -Triple aarch64-pc-windows-msvc   # cross-compile (needs rustup target)
