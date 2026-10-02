@@ -83,9 +83,11 @@ impl<'a> Reader<'a> {
         Ok(v)
     }
     fn vertex_id(&mut self) -> R<i64> { self.id_of(self.vs) }
+    #[allow(dead_code)] // kept for symmetry; materials read via id_of(ts)
     fn texture_id(&mut self) -> R<i64> { self.id_of(self.ts) }
     fn material_id(&mut self) -> R<i64> { self.id_of(self.ms) }
     fn bone_id(&mut self) -> R<i64> { self.id_of(self.bs) }
+    #[allow(dead_code)] // kept for symmetry; morph refs read via id_of(mos)
     fn morph_id(&mut self) -> R<i64> { self.id_of(self.mos) }
     fn rigid_id(&mut self) -> R<i64> { self.id_of(self.rbs) }
 
@@ -142,16 +144,28 @@ fn size_from_byte(b: u8) -> R<IdSize> {
 }
 
 /// Parse a complete PMX buffer.
+///
+/// Header layout per spec: bytes 0..4 = `b"PMX "`, byte 4 = `'0'` or `'1'`,
+/// byte 5 = NUL, bytes 6-7 unused, then the f32 version at offset 8.
 pub fn read_pmx(data: &[u8]) -> Result<PmxModel> {
-    if data.len() < 9 {
+    if data.len() < 8 {
         return Err(MmdconvError::pmx_parse(0, "file too short to be PMX"));
     }
-    if &data[0..8] != b"PMX 3.1\0" {
-        return Err(MmdconvError::pmx_parse(0, "missing PMX magic header"));
+    // Friendly diagnostic for the known non-standard "PMX \r\n" variant some
+    // third-party exporters emit.
+    if &data[0..4] == b"PMX " && data[4] == b'\r' {
+        return Err(MmdconvError::pmx_parse(
+            4,
+            "file uses a non-standard line-break header variant; re-save it with PMXEditor",
+        ));
+    }
+    if &data[0..4] != b"PMX " || (data[4] != b'0' && data[4] != b'1') || data[5] != 0 {
+        let got = String::from_utf8_lossy(&data[..data.len().min(8)]);
+        return Err(MmdconvError::pmx_parse(0, format!("missing PMX magic header (got {:?})", got)));
     }
     let mut r = Reader {
         d: data,
-        p: 4,
+        p: 8,
         encoding: PmxEncoding::Utf16Le,
         vs: IdSize::U32,
         ts: IdSize::U32,
@@ -164,7 +178,7 @@ pub fn read_pmx(data: &[u8]) -> Result<PmxModel> {
     };
     let ver = r.f32()?;
     if (ver - 2.0).abs() > 1e-6 && (ver - 2.1).abs() > 1e-6 {
-        return Err(MmdconvError::pmx_parse(4, format!("unsupported PMX version {ver}")));
+        return Err(MmdconvError::pmx_parse(8, format!("unsupported PMX version {ver}")));
     }
     let global_count = r.u8()?;
     if global_count < 8 {
@@ -810,7 +824,7 @@ mod tests {
             let len = 8 + (next() as usize) * 4;
             let mut buf: Vec<u8> = Vec::with_capacity(len);
             if trial % 3 == 0 {
-                buf.extend_from_slice(b"PMX 3.1\0");
+                buf.extend_from_slice(b"PMX 0\0\0\0");
             }
             while buf.len() < len {
                 buf.push(next());

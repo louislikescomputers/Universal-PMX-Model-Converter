@@ -133,9 +133,9 @@ pub fn deduplicate_vertices(mesh: &mut Mesh) {
             mix(w.bone as i64);
             mix(q(w.weight));
         }
-        if let Some((a, b)) = v.uv1 {
-            mix(q(a));
-            mix(q(b));
+        if let Some(uv1) = v.uv1 {
+            mix(q(uv1[0]));
+            mix(q(uv1[1]));
         } else {
             mix(i64::MIN);
         }
@@ -184,6 +184,11 @@ impl JsonValue {
             JsonValue::Arr(a) => Some(a),
             _ => None,
         }
+    }
+    /// Owned clone of the array if this value is an array (convenience for
+    /// iterating JSON sections without borrow juggling).
+    pub fn as_array_owned(&self) -> Option<Vec<JsonValue>> {
+        self.as_array().map(|a| a.to_vec())
     }
     pub fn as_f64(&self) -> Option<f64> {
         match self {

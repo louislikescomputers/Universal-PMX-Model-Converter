@@ -264,7 +264,7 @@ impl Default for PmxMaterial {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BoneTarget {
     Index(u32),
     Position(Vec3),
@@ -276,7 +276,7 @@ pub enum TailType {
     Offset(Vec3),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Inherit {
     pub bone: u32,
     pub ratio: f32,

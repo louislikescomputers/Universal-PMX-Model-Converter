@@ -73,7 +73,7 @@ pub struct Weight {
     pub weight: f32,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Vertex {
     pub pos: Vec3,
     pub normal: Vec3,
@@ -233,7 +233,7 @@ pub enum BoneKind {
     Node,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Bone {
     pub id: BoneId,
     pub name: LText,
@@ -297,7 +297,7 @@ impl Skeleton {
         }
     }
 
-    pub fn assert_topological(&self) -> Result<()> {
+    pub fn assert_topological(&self) -> crate::error::Result<()> {
         for b in &self.bones {
             if let Some(p) = b.parent {
                 if p >= b.id {
@@ -441,6 +441,9 @@ pub struct IrModel {
     pub springs: Vec<SpringBone>,
     /// Nodes that carry whole-mesh transforms (for unskinned rigid binding).
     pub mesh_attachments: Vec<(MeshId, BoneId)>,
+    /// VRM expression preset name → raw JSON entry (captured by the VRM importer;
+    /// morph conversion resolves these against mesh targets later).
+    pub vrm_expressions: Vec<(String, crate::importers::common::JsonValue)>,
     pub humanoid_map_present: bool,
 }
 
@@ -459,6 +462,7 @@ impl IrModel {
             rigid_bodies: Vec::new(),
             springs: Vec::new(),
             mesh_attachments: Vec::new(),
+            vrm_expressions: Vec::new(),
             humanoid_map_present: false,
         }
     }

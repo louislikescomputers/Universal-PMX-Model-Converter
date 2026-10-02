@@ -201,7 +201,8 @@ pub fn write_pmx(m: &PmxModel, opts: &WriterOpts) -> Result<Vec<u8>> {
     let mut w = W { buf: Vec::with_capacity(1 << 16) };
 
     // header
-    w.buf.extend_from_slice(b"PMX 3.1\x00");
+    // spec header: "PMX " + version byte ('0' or '1') + NUL + 2 pad bytes; f32 version follows at offset 8
+    if m.version >= 2.1 { w.buf.extend_from_slice(b"PMX 1\0\0\0"); } else { w.buf.extend_from_slice(b"PMX 0\0\0\0"); }
     w.f32(m.version);
     w.u8(if m.version >= 2.1 { 9 } else { 8 }); // global count
     w.u8(match enc { PmxEncoding::Utf16Le => 0, PmxEncoding::Utf8 => 1 });
